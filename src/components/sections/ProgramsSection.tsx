@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Users, GraduationCap } from 'lucide-react';
+import { cn } from '@/lib/utils'; // Import fungsi cn
 
 const programs = [
   {
