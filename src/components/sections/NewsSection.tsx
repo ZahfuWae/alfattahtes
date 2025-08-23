@@ -1,35 +1,69 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import axios from 'axios';
 
-const newsItems = [
-  {
-    title: 'Penerimaan Santri Baru Tahun Ajaran 2025/2026',
-    date: '23 Agustus 2025',
-    author: 'Admin',
-    excerpt: 'Informasi lengkap mengenai jadwal dan persyaratan pendaftaran santri baru untuk semua jenjang pendidikan.',
-    link: '/informasi/berita/penerimaan-santri-baru',
-    image: 'https://via.placeholder.com/400x250/FFD700/FFFFFF?text=Berita+1',
-  },
-  {
-    title: 'Kegiatan Muharram: Santunan Anak Yatim dan Dhuafa',
-    date: '10 Agustus 2025',
-    author: 'Admin',
-    excerpt: 'Pondok Pesantren Al-Fattah mengadakan acara santunan dalam rangka menyambut Tahun Baru Islam 1447 H.',
-    link: '/informasi/berita/kegiatan-muharram',
-    image: 'https://via.placeholder.com/400x250/87CEEB/FFFFFF?text=Berita+2',
-  },
-  {
-    title: 'Workshop Peningkatan Kualitas Guru dan Ustadz',
-    date: '01 Agustus 2025',
-    author: 'Admin',
-    excerpt: 'Pelatihan rutin untuk meningkatkan kompetensi pengajar dalam metode pembelajaran modern dan Islami.',
-    link: '/informasi/berita/workshop-guru',
-    image: 'https://via.placeholder.com/400x250/90EE90/FFFFFF?text=Berita+3',
-  },
-];
+// Interface untuk struktur data postingan dari WordPress API
+interface WordPressPost {
+  id: number;
+  slug: string;
+  title: { rendered: string };
+  excerpt: { rendered: string };
+  date: string;
+  _embedded?: {
+    'wp:featuredmedia'?: Array<{ source_url: string }>;
+    author?: Array<{ name: string }>;
+  };
+}
 
 const NewsSection = () => {
+  const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const response = await axios.get<WordPressPost[]>(
+          'https://fathatulhidayah.sch.id/wp-json/wp/v2/posts?_embed&per_page=3' // Mengambil 3 postingan terbaru dengan data tambahan (gambar, penulis)
+        );
+
+        const formattedNews = response.data.map((post) => ({
+          title: post.title.rendered,
+          date: new Date(post.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
+          author: post._embedded?.author?.[0]?.name || 'Admin',
+          excerpt: post.excerpt.rendered.replace(/<[^>]*>?/gm, ''), // Hapus tag HTML dari excerpt
+          link: `/informasi/berita/${post.slug}`,
+          image: post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/400x250/CCCCCC/FFFFFF?text=No+Image',
+        }));
+        setNewsItems(formattedNews);
+      } catch (err) {
+        console.error("Gagal mengambil berita dari WordPress API:", err);
+        setError('Gagal memuat berita. Pastikan situs WordPress Anda aktif dan dapat diakses.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNews();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="container mx-auto py-16 px-4 text-center">
+        <p className="text-gray-600 dark:text-gray-300">Memuat berita terbaru...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="container mx-auto py-16 px-4 text-center">
+        <p className="text-red-500 dark:text-red-400">{error}</p>
+      </section>
+    );
+  }
+
   return (
     <section className="container mx-auto py-16 px-4">
       <div className="text-center mb-12">
