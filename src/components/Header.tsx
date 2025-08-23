@@ -48,7 +48,7 @@ const Header = () => {
             alt="Pondok Pesantren Al-Fattah Logo"
             className="h-8 w-auto"
           />
-          <span className="font-bold text-lg text-primary-foreground">Al-Fattah</span>
+          <span className="font-bold text-lg text-primary-foreground">PONDOK PESANTREN AL-FATTAH</span>
         </Link>
 
         {/* Desktop Navigation */}
