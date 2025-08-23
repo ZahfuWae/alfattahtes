@@ -99,3 +99,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-text-gradient {
+  background: linear-gradient(90deg, #fda00f, #0fbaf4, #554e9f, #fda00f); /* Mengulang warna pertama untuk loop yang mulus */
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-animation 5s ease infinite;
+}
