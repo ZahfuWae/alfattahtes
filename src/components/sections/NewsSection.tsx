@@ -3,16 +3,30 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import axios from 'axios';
 
-// Interface untuk struktur data postingan dari WordPress API
-interface WordPressPost {
-  id: number;
+// Interface untuk struktur data postingan dari WordPress GraphQL API
+interface GraphQLPostNode {
+  id: string;
   slug: string;
-  title: { rendered: string };
-  excerpt: { rendered: string };
+  title: string;
+  excerpt: string;
   date: string;
-  _embedded?: {
-    'wp:featuredmedia'?: Array<{ source_url: string }>;
-    author?: Array<{ name: string }>;
+  author: {
+    node: {
+      name: string;
+    };
+  };
+  featuredImage: {
+    node: {
+      sourceUrl: string;
+    };
+  } | null; // Bisa null jika tidak ada gambar unggulan
+}
+
+interface GraphQLResponse {
+  data: {
+    posts: {
+      nodes: GraphQLPostNode[];
+    };
   };
 }
 
@@ -24,22 +38,48 @@ const NewsSection = () => {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await axios.get<WordPressPost[]>(
-          'https://fathatulhidayah.sch.id/wp-json/wp/v2/posts?_embed&per_page=3' // Mengambil 3 postingan terbaru dengan data tambahan (gambar, penulis)
-        );
+        const GRAPHQL_API_URL = 'https://fathatulhidayah.sch.id/graphql'; // Endpoint GraphQL Anda
 
-        const formattedNews = response.data.map((post) => ({
-          title: post.title.rendered,
+        const query = `
+          query GetPosts {
+            posts(first: 3, where: { status: PUBLISH }) { # Mengambil 3 postingan yang dipublikasikan
+              nodes {
+                id
+                slug
+                title
+                excerpt
+                date
+                author {
+                  node {
+                    name
+                  }
+                }
+                featuredImage {
+                  node {
+                    sourceUrl
+                  }
+                }
+              }
+            }
+          }
+        `;
+
+        const response = await axios.post<GraphQLResponse>(GRAPHQL_API_URL, { query });
+
+        const posts = response.data.data.posts.nodes;
+
+        const formattedNews = posts.map((post) => ({
+          title: post.title,
           date: new Date(post.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
-          author: post._embedded?.author?.[0]?.name || 'Admin',
-          excerpt: post.excerpt.rendered.replace(/<[^>]*>?/gm, ''), // Hapus tag HTML dari excerpt
+          author: post.author?.node?.name || 'Admin',
+          excerpt: post.excerpt.replace(/<[^>]*>?/gm, ''), // Hapus tag HTML dari excerpt
           link: `/informasi/berita/${post.slug}`,
-          image: post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/400x250/CCCCCC/FFFFFF?text=No+Image',
+          image: post.featuredImage?.node?.sourceUrl || 'https://via.placeholder.com/400x250/CCCCCC/FFFFFF?text=No+Image',
         }));
         setNewsItems(formattedNews);
       } catch (err) {
-        console.error("Gagal mengambil berita dari WordPress API:", err);
-        setError('Gagal memuat berita. Pastikan situs WordPress Anda aktif dan dapat diakses.');
+        console.error("Gagal mengambil berita dari WordPress GraphQL API:", err);
+        setError('Gagal memuat berita. Pastikan plugin WPGraphQL aktif dan situs WordPress Anda dapat diakses.');
       } finally {
         setLoading(false);
       }

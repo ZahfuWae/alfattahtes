@@ -5,17 +5,37 @@ import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import axios from 'axios';
 
-// Interface untuk struktur data postingan dari WordPress API
-interface WordPressPost {
-  id: number;
+// Interface untuk struktur data postingan dari WordPress GraphQL API
+interface GraphQLPostNode {
+  id: string;
   slug: string;
-  title: { rendered: string };
-  content: { rendered: string };
-  excerpt: { rendered: string };
+  title: string;
+  content: string;
+  excerpt: string;
   date: string;
-  _embedded?: {
-    'wp:featuredmedia'?: Array<{ source_url: string }>;
-    author?: Array<{ name: string }>;
+  author: {
+    node: {
+      name: string;
+    };
+  };
+  featuredImage: {
+    node: {
+      sourceUrl: string;
+    };
+  } | null;
+}
+
+interface GraphQLResponseSinglePost {
+  data: {
+    postBy: GraphQLPostNode;
+  };
+}
+
+interface GraphQLResponseAllPosts {
+  data: {
+    posts: {
+      nodes: GraphQLPostNode[];
+    };
   };
 }
 
@@ -31,29 +51,91 @@ const BeritaPage = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get<WordPressPost[]>(
-          `https://fathatulhidayah.sch.id/wp-json/wp/v2/posts?_embed&per_page=100` // Mengambil lebih banyak postingan untuk daftar
-        );
+        const GRAPHQL_API_URL = 'https://fathatulhidayah.sch.id/graphql';
 
-        const formattedNews = response.data.map((post) => ({
-          title: post.title.rendered,
+        // Query untuk mengambil semua postingan (untuk daftar)
+        const allPostsQuery = `
+          query AllPosts {
+            posts(first: 100, where: { status: PUBLISH }) {
+              nodes {
+                id
+                slug
+                title
+                excerpt
+                date
+                author {
+                  node {
+                    name
+                  }
+                }
+                featuredImage {
+                  node {
+                    sourceUrl
+                  }
+                }
+              }
+            }
+          }
+        `;
+        const allPostsResponse = await axios.post<GraphQLResponseAllPosts>(GRAPHQL_API_URL, { query: allPostsQuery });
+        const allPosts = allPostsResponse.data.data.posts.nodes;
+
+        const formattedAllNews = allPosts.map((post) => ({
+          title: post.title,
           date: new Date(post.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
-          author: post._embedded?.author?.[0]?.name || 'Admin',
-          excerpt: post.excerpt.rendered.replace(/<[^>]*>?/gm, ''),
-          content: post.content.rendered,
+          author: post.author?.node?.name || 'Admin',
+          excerpt: post.excerpt.replace(/<[^>]*>?/gm, ''),
+          content: post.content, // Konten penuh tidak selalu ada di query daftar, akan diambil terpisah jika slug ada
           link: `/informasi/berita/${post.slug}`,
           slug: post.slug,
-          image: post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/800x450/CCCCCC/FFFFFF?text=No+Image',
+          image: post.featuredImage?.node?.sourceUrl || 'https://via.placeholder.com/800x450/CCCCCC/FFFFFF?text=No+Image',
         }));
-        setAllNewsItems(formattedNews);
+        setAllNewsItems(formattedAllNews);
 
         if (slug) {
-          const foundItem = formattedNews.find((item) => item.slug === slug);
-          setNewsItem(foundItem);
+          // Query untuk mengambil satu postingan berdasarkan slug
+          const singlePostQuery = `
+            query SinglePost($slug: String!) {
+              postBy(slug: $slug) {
+                id
+                slug
+                title
+                content
+                date
+                author {
+                  node {
+                    name
+                  }
+                }
+                featuredImage {
+                  node {
+                    sourceUrl
+                  }
+                }
+              }
+            }
+          `;
+          const singlePostResponse = await axios.post<GraphQLResponseSinglePost>(GRAPHQL_API_URL, {
+            query: singlePostQuery,
+            variables: { slug },
+          });
+
+          const post = singlePostResponse.data.data.postBy;
+          if (post) {
+            setNewsItem({
+              title: post.title,
+              date: new Date(post.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
+              author: post.author?.node?.name || 'Admin',
+              content: post.content,
+              image: post.featuredImage?.node?.sourceUrl || 'https://via.placeholder.com/800x450/CCCCCC/FFFFFF?text=No+Image',
+            });
+          } else {
+            setError('Berita tidak ditemukan.');
+          }
         }
       } catch (err) {
-        console.error("Gagal mengambil berita dari WordPress API:", err);
-        setError('Gagal memuat berita. Pastikan situs WordPress Anda aktif dan dapat diakses.');
+        console.error("Gagal mengambil berita dari WordPress GraphQL API:", err);
+        setError('Gagal memuat berita. Pastikan plugin WPGraphQL aktif dan situs WordPress Anda dapat diakses.');
       } finally {
         setLoading(false);
       }
