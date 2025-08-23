@@ -1,5 +1,4 @@
 import React from 'react';
-import { MadeWithDyad } from './made-with-dyad';
 
 const Footer = () => {
   return (
@@ -8,7 +7,6 @@ const Footer = () => {
         <p className="text-sm mb-2">
           &copy; {new Date().getFullYear()} Pondok Pesantren Al-Fattah. All rights reserved.
         </p>
-        <MadeWithDyad />
       </div>
     </footer>
   );
